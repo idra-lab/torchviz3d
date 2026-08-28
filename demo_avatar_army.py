@@ -15,9 +15,18 @@ except ImportError:
 
 BOX_FACES = np.array(
     [
-        [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6],
-        [0, 4, 5], [0, 5, 1], [1, 5, 6], [1, 6, 2],
-        [2, 6, 7], [2, 7, 3], [3, 7, 4], [3, 4, 0],
+        [0, 1, 2],
+        [0, 2, 3],
+        [4, 6, 5],
+        [4, 7, 6],
+        [0, 4, 5],
+        [0, 5, 1],
+        [1, 5, 6],
+        [1, 6, 2],
+        [2, 6, 7],
+        [2, 7, 3],
+        [3, 7, 4],
+        [3, 4, 0],
     ],
     dtype=np.int32,
 )
@@ -28,8 +37,14 @@ def box(center, size, pivot, swing):
     size = 0.5 * np.asarray(size, np.float32)
     corners = np.array(
         [
-            [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
-            [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1],
         ],
         dtype=np.float32,
     )
@@ -67,7 +82,9 @@ def grid_offsets(n, spacing, device):
 
 
 def expand_faces(faces, copies, verts_per_avatar):
-    return np.vstack([faces + i * verts_per_avatar for i in range(copies)]).astype(np.int32)
+    return np.vstack([faces + i * verts_per_avatar for i in range(copies)]).astype(
+        np.int32
+    )
 
 
 def animate(base, pivots, swings, offsets, phases, t):
@@ -111,14 +128,23 @@ def main():
     swings = torch.as_tensor(swings, device=device)
     offsets = grid_offsets(args.avatars, args.spacing, device)
     phases = torch.linspace(0.0, 6.28, args.avatars, device=device)
-    faces = torch.as_tensor(expand_faces(base_f, args.avatars, base_v.shape[0]), device=device)
+    faces = torch.as_tensor(
+        expand_faces(base_f, args.avatars, base_v.shape[0]), device=device
+    )
 
     verts = animate(base, pivots, swings, offsets, phases, 0.0)
     vis.add_mesh("army", verts, faces, color=(0.18, 0.56, 0.92))
     side = int(np.ceil(np.sqrt(args.avatars)))
-    vis.set_view(target=(0, 0, 0.8), distance=max(5.0, side * args.spacing * 1.15), yaw_deg=42, pitch_deg=28)
+    vis.set_view(
+        target=(0, 0, 0.8),
+        distance=max(5.0, side * args.spacing * 1.15),
+        yaw_deg=42,
+        pitch_deg=28,
+    )
 
-    print(f"{args.avatars} avatars | {verts.shape[0]} vertices | {faces.shape[0]} faces")
+    print(
+        f"{args.avatars} avatars | {verts.shape[0]} vertices | {faces.shape[0]} faces"
+    )
     t0 = time.perf_counter()
     try:
         while vis.is_open():

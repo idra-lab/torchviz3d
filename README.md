@@ -109,38 +109,37 @@ From the workspace root:
 ```bash
 cd /home/nardi/sensor_fusion_ws/fitting_ws
 ```
-
-Run the procedural demo. It does not need external meshes, models, or datasets.
-
-```bash
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __GL_SYNC_TO_VBLANK=0 \
-python3 Vitruvius/viewer/demo_avatar_army.py --avatars 1024
+Set the correct graphics rendering environment variables for NVIDIA PRIME/Optimus systems:
 ```
-
-Heavier version:
-
-```bash
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __GL_SYNC_TO_VBLANK=0 \
-python3 Vitruvius/viewer/demo_avatar_army.py --avatars 4096 --spacing 0.85
+export __NV_PRIME_RENDER_OFFLOAD=1; export __GLX_VENDOR_LIBRARY_NAME=nvidia; export __GL_SYNC_TO_VBLANK=0
 ```
 
 Minimal triangle demo:
 
 ```bash
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __GL_SYNC_TO_VBLANK=0 \
-python3 Vitruvius/viewer/demo_torch_gl_viewer.py
+python3 demo_triangle.py
 ```
+
+Preview:
+
+<img src="assets/triangle.png" alt="triangle demo" width="600" align="center" />
+
+
+Run the procedural demo. It does not need external meshes, models, or datasets.
+```bash
+python3 demo_avatar_army.py --avatars 1024
+```
+
 
 Stanford bunny mesh and point cloud side by side:
 
 ```bash
-__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia __GL_SYNC_TO_VBLANK=0 \
 python3 Vitruvius/viewer/demo_bunny_mesh_pointcloud.py
 ```
 
 Preview:
 
-![Stanford bunny mesh and point cloud demo](assets/bunny.png)
+<img src="assets/bunny.png" alt="Stanford bunny mesh and point cloud demo" width="600" align="center" />
 
 ## Reading The Timings
 
@@ -161,17 +160,3 @@ Meaning:
 If `present` is around `16.6 ms`, the application is probably waiting for a
 60 Hz display refresh. In that case, `view` is the important number for viewer
 performance.
-
-## Video
-
-Add the demo video here:
-
-```markdown
-![TorchGL Viewer demo](path/to/demo.gif)
-```
-
-Or:
-
-```html
-<video src="path/to/demo.mp4" controls width="100%"></video>
-```

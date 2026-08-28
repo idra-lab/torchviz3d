@@ -134,8 +134,12 @@ def normalize_vertices(vertices):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stanford bunny mesh + point cloud demo.")
-    parser.add_argument("--ply", type=Path, default=Path(__file__).with_name("bunny.ply"))
+    parser = argparse.ArgumentParser(
+        description="Stanford bunny mesh + point cloud demo."
+    )
+    parser.add_argument(
+        "--ply", type=Path, default=Path(__file__).with_name("bunny.ply")
+    )
     parser.add_argument("--width", type=int, default=1600)
     parser.add_argument("--height", type=int, default=900)
     parser.add_argument("--cuda-device", type=int, default=0)
@@ -168,7 +172,13 @@ def main():
     vertices = torch.as_tensor(vertices_np, device=device)
     faces = torch.as_tensor(faces_np, device=device)
 
-    vis.add_mesh("bunny_mesh", vertices, faces, color=(0.20, 0.56, 0.90), offset=(-0.55, 0.0, 0.0))
+    vis.add_mesh(
+        "bunny_mesh",
+        vertices,
+        faces,
+        color=(0.20, 0.56, 0.90),
+        offset=(-0.55, 0.0, 0.0),
+    )
     vis.add_points(
         "bunny_cloud",
         vertices,
@@ -179,8 +189,7 @@ def main():
     vis.set_view(target=(0.0, 0.0, 0.02), distance=2.4, yaw_deg=35.0, pitch_deg=18.0)
 
     print(
-        f"{args.ply.name} | {vertices.shape[0]} points | "
-        f"{faces.shape[0]} triangles"
+        f"{args.ply.name} | {vertices.shape[0]} points | " f"{faces.shape[0]} triangles"
     )
 
     try:

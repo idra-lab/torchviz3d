@@ -1,7 +1,14 @@
 import torch
 from torch_gl_viewer import TorchGLViewer
 
-vis = TorchGLViewer("Tracking", width=1600, height=1000, vsync=True, cuda_device=0)
+vis = TorchGLViewer(
+    "Tracking",
+    width=1600,
+    height=1000,
+    background=(0.97, 0.97, 0.95),
+    vsync=True,
+    cuda_device=0,
+)
 vis.set_lighting(
     direction=(0.25, -0.45, -1.0),
     ambient=0.22,
@@ -13,10 +20,7 @@ device = f"cuda:{vis.cuda_device}"
 
 # Example mesh
 verts = torch.tensor(
-    [[-1., -1., 0.],
-     [ 1., -1., 0.],
-     [ 0.,  1., 0.]],
-    device=device
+    [[-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [0.0, 1.0, 0.0]], device=device
 )
 
 faces = torch.tensor([[0, 1, 2]], device=device)

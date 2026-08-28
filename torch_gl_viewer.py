@@ -45,6 +45,7 @@ except ImportError:
 
 # ------------------------------- CUDA helpers -------------------------------
 
+
 def _decode_cuda_text(x):
     if isinstance(x, bytes):
         return x.decode(errors="replace")
@@ -92,7 +93,7 @@ def _gl_string(name) -> str:
 def _current_gl_cuda_devices():
     if not hasattr(cudart, "cudaGLGetDevices"):
         return None
-    (count, devices) = _cuda_check(
+    count, devices = _cuda_check(
         cudart.cudaGLGetDevices(
             16,
             cudart.cudaGLDeviceList.cudaGLDeviceListAll,
@@ -192,6 +193,7 @@ def _copy_cuda_tensor_to_gl_buffer(resource, tensor: torch.Tensor):
 
 # ------------------------------- math helpers -------------------------------
 
+
 def _normalize(v):
     v = np.asarray(v, dtype=np.float32)
     n = np.linalg.norm(v)
@@ -229,6 +231,7 @@ def _perspective(fovy_deg, aspect, znear, zfar):
 
 
 # ------------------------------- GL helpers ---------------------------------
+
 
 def _compile_shader(src: str, shader_type):
     shader = GL.glCreateShader(shader_type)
@@ -563,8 +566,12 @@ class _TextOverlay:
                     y1 = y0 + scale
                     quads.extend(
                         [
-                            (x0, y0), (x1, y0), (x1, y1),
-                            (x0, y0), (x1, y1), (x0, y1),
+                            (x0, y0),
+                            (x1, y0),
+                            (x1, y1),
+                            (x0, y0),
+                            (x1, y1),
+                            (x0, y1),
                         ]
                     )
             x += step
@@ -580,16 +587,28 @@ class _TextOverlay:
             GL.GL_STATIC_DRAW,
         )
         GL.glEnableVertexAttribArray(0)
-        GL.glVertexAttribPointer(0, 2, GL.GL_FLOAT, GL.GL_FALSE, 2 * 4, ctypes.c_void_p(0))
+        GL.glVertexAttribPointer(
+            0, 2, GL.GL_FLOAT, GL.GL_FALSE, 2 * 4, ctypes.c_void_p(0)
+        )
         GL.glBindVertexArray(0)
 
-    def draw(self, screen_w: int, screen_h: int, x: int, y: int, color=(0.0, 0.0, 0.0, 0.88)):
+    def draw(
+        self, screen_w: int, screen_h: int, x: int, y: int, color=(0.0, 0.0, 0.0, 0.88)
+    ):
         if self.vertices.size == 0:
             return
         GL.glUseProgram(self.program)
-        GL.glUniform2f(_uniform_location(self._uniform_locations, self.program, "u_screen"), screen_w, screen_h)
-        GL.glUniform2f(_uniform_location(self._uniform_locations, self.program, "u_offset"), x, y)
-        GL.glUniform4f(_uniform_location(self._uniform_locations, self.program, "u_color"), *color)
+        GL.glUniform2f(
+            _uniform_location(self._uniform_locations, self.program, "u_screen"),
+            screen_w,
+            screen_h,
+        )
+        GL.glUniform2f(
+            _uniform_location(self._uniform_locations, self.program, "u_offset"), x, y
+        )
+        GL.glUniform4f(
+            _uniform_location(self._uniform_locations, self.program, "u_color"), *color
+        )
 
         GL.glDisable(GL.GL_DEPTH_TEST)
         GL.glEnable(GL.GL_BLEND)
@@ -702,7 +721,9 @@ class TorchGLViewer:
         self.point_program = _make_program(POINT_VS, POINT_FS)
         self._uniform_locations = {}
         self.text_overlay = _TextOverlay()
-        self.text_overlay.set_text("LMB ORBIT | RMB PAN | WHEEL ZOOM | R RESET | ESC CLOSE")
+        self.text_overlay.set_text(
+            "LMB ORBIT | RMB PAN | WHEEL ZOOM | R RESET | ESC CLOSE"
+        )
         self.triangle_overlay = _TextOverlay()
         self._triangle_overlay_count = None
 
@@ -934,43 +955,40 @@ class TorchGLViewer:
         self._set_mat4(self.mesh_program, "u_proj", proj)
         GL.glUniform3fv(
             self._uniform_location(self.mesh_program, "u_light_dir"),
-            1, self.lighting.direction
+            1,
+            self.lighting.direction,
         )
         GL.glUniform3fv(
             self._uniform_location(self.mesh_program, "u_light_color"),
-            1, self.lighting.color
+            1,
+            self.lighting.color,
         )
-        GL.glUniform3fv(
-            self._uniform_location(self.mesh_program, "u_view_pos"),
-            1, eye
-        )
+        GL.glUniform3fv(self._uniform_location(self.mesh_program, "u_view_pos"), 1, eye)
         GL.glUniform1f(
             self._uniform_location(self.mesh_program, "u_ambient_strength"),
-            self.lighting.ambient
+            self.lighting.ambient,
         )
         GL.glUniform1f(
             self._uniform_location(self.mesh_program, "u_diffuse_strength"),
-            self.lighting.diffuse
+            self.lighting.diffuse,
         )
         GL.glUniform1f(
             self._uniform_location(self.mesh_program, "u_specular_strength"),
-            self.lighting.specular
+            self.lighting.specular,
         )
         GL.glUniform1f(
             self._uniform_location(self.mesh_program, "u_shininess"),
-            self.lighting.shininess
+            self.lighting.shininess,
         )
 
         for m in self.meshes.values():
             if not m.visible or m.n_indices == 0:
                 continue
             GL.glUniform3fv(
-                self._uniform_location(self.mesh_program, "u_color"),
-                1, m.color
+                self._uniform_location(self.mesh_program, "u_color"), 1, m.color
             )
             GL.glUniform3fv(
-                self._uniform_location(self.mesh_program, "u_offset"),
-                1, m.offset
+                self._uniform_location(self.mesh_program, "u_offset"), 1, m.offset
             )
             GL.glBindVertexArray(m.vao)
             GL.glDrawElements(
@@ -989,16 +1007,13 @@ class TorchGLViewer:
             if not p.visible or p.n_points == 0:
                 continue
             GL.glUniform3fv(
-                self._uniform_location(self.point_program, "u_color"),
-                1, p.color
+                self._uniform_location(self.point_program, "u_color"), 1, p.color
             )
             GL.glUniform3fv(
-                self._uniform_location(self.point_program, "u_offset"),
-                1, p.offset
+                self._uniform_location(self.point_program, "u_offset"), 1, p.offset
             )
             GL.glUniform1f(
-                self._uniform_location(self.point_program, "u_point_size"),
-                p.point_size
+                self._uniform_location(self.point_program, "u_point_size"), p.point_size
             )
             GL.glBindVertexArray(p.vao)
             GL.glDrawArrays(GL.GL_POINTS, 0, p.n_points)
@@ -1262,13 +1277,13 @@ if __name__ == "__main__":
     verts = torch.tensor(
         [
             [-1, -1, -1],
-            [ 1, -1, -1],
-            [ 1,  1, -1],
-            [-1,  1, -1],
-            [-1, -1,  1],
-            [ 1, -1,  1],
-            [ 1,  1,  1],
-            [-1,  1,  1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1],
         ],
         dtype=torch.float32,
         device=dev,
@@ -1276,12 +1291,18 @@ if __name__ == "__main__":
 
     faces = torch.tensor(
         [
-            [0, 1, 2], [0, 2, 3],
-            [4, 6, 5], [4, 7, 6],
-            [0, 4, 5], [0, 5, 1],
-            [1, 5, 6], [1, 6, 2],
-            [2, 6, 7], [2, 7, 3],
-            [3, 7, 4], [3, 4, 0],
+            [0, 1, 2],
+            [0, 2, 3],
+            [4, 6, 5],
+            [4, 7, 6],
+            [0, 4, 5],
+            [0, 5, 1],
+            [1, 5, 6],
+            [1, 6, 2],
+            [2, 6, 7],
+            [2, 7, 3],
+            [3, 7, 4],
+            [3, 4, 0],
         ],
         dtype=torch.int32,
         device=dev,
