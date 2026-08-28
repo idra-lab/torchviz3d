@@ -1,7 +1,7 @@
 # TorchGL Viewer
 
-A small high-performance 3D viewer for meshes and point clouds stored as
-PyTorch CUDA tensors.
+A small high-performance 3D viewer for meshes and point clouds stored as PyTorch CUDA tensors. 
+It can easily handle millions of triangles at a high frame rates avoiding CPU-GPU synchronization. 
 
 https://github.com/user-attachments/assets/9abbaaa6-29f0-4836-9118-e93a26098493
 
