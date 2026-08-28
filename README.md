@@ -106,11 +106,6 @@ driver and CUDA/OpenGL interop will not work.
 
 ## Demo
 
-From the workspace root:
-
-```bash
-cd /home/nardi/sensor_fusion_ws/fitting_ws
-```
 Set the correct graphics rendering environment variables for NVIDIA PRIME/Optimus systems:
 ```
 export __NV_PRIME_RENDER_OFFLOAD=1; export __GLX_VENDOR_LIBRARY_NAME=nvidia; export __GL_SYNC_TO_VBLANK=0
