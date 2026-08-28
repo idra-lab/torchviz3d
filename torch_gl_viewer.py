@@ -175,6 +175,10 @@ def _cuda_graphics_unmap_resource(resource):
 
 def _copy_cuda_tensor_to_gl_buffer(resource, tensor: torch.Tensor):
     """Map GL buffer in CUDA and copy tensor device-to-device."""
+    if tensor.numel() == 0:
+        return
+    if resource is None:
+        raise RuntimeError("Cannot upload a non-empty CUDA tensor to an unregistered GL buffer")
     _cuda_graphics_map_resource(resource)
     try:
         ptr, size = _cuda_check(
@@ -274,16 +278,21 @@ def _uniform_location(cache: dict, program, name: str):
 MESH_VS = r"""
 #version 330 core
 layout(location = 0) in vec3 in_pos;
+layout(location = 1) in vec3 in_color;
 
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform vec3 u_offset;
+uniform vec3 u_color;
+uniform bool u_use_vertex_color;
 
 out vec3 v_world_pos;
+out vec3 v_color;
 
 void main() {
     vec3 p = in_pos + u_offset;
     v_world_pos = p;
+    v_color = u_use_vertex_color ? in_color : u_color;
     gl_Position = u_proj * u_view * vec4(p, 1.0);
 }
 """
@@ -293,9 +302,9 @@ void main() {
 MESH_FS = r"""
 #version 330 core
 in vec3 v_world_pos;
+in vec3 v_color;
 out vec4 out_color;
 
-uniform vec3 u_color;
 uniform vec3 u_light_dir;
 uniform vec3 u_light_color;
 uniform vec3 u_view_pos;
@@ -316,8 +325,8 @@ void main() {
 
     float ndotl = max(dot(N, L), 0.0);
     float specular = pow(max(dot(N, H), 0.0), u_shininess);
-    vec3 ambient_term = u_ambient_strength * u_color;
-    vec3 diffuse_term = u_diffuse_strength * ndotl * u_color;
+    vec3 ambient_term = u_ambient_strength * v_color;
+    vec3 diffuse_term = u_diffuse_strength * ndotl * v_color;
     vec3 specular_term = u_specular_strength * specular * u_light_color;
     out_color = vec4(ambient_term + diffuse_term + specular_term, 1.0);
 }
@@ -466,11 +475,13 @@ class _MeshGPU:
     def __init__(self):
         self.vao = GL.glGenVertexArrays(1)
         self.vbo = _GLBuffer(GL.GL_ARRAY_BUFFER)
+        self.cbo = _GLBuffer(GL.GL_ARRAY_BUFFER)
         self.ebo = _GLBuffer(GL.GL_ELEMENT_ARRAY_BUFFER)
         self.n_vertices = 0
         self.n_indices = 0
         self.color = np.array([0.8, 0.8, 0.8], dtype=np.float32)
         self.offset = np.zeros(3, dtype=np.float32)
+        self.has_vertex_colors = False
         self.visible = True
 
     def bind_layout(self):
@@ -482,11 +493,22 @@ class _MeshGPU:
             0, 3, GL.GL_FLOAT, GL.GL_FALSE, 3 * 4, ctypes.c_void_p(0)
         )
 
+        if self.has_vertex_colors:
+            GL.glBindBuffer(GL.GL_ARRAY_BUFFER, self.cbo.gl_id)
+            GL.glEnableVertexAttribArray(1)
+            GL.glVertexAttribPointer(
+                1, 3, GL.GL_FLOAT, GL.GL_FALSE, 3 * 4, ctypes.c_void_p(0)
+            )
+        else:
+            GL.glDisableVertexAttribArray(1)
+            GL.glVertexAttrib3f(1, 1.0, 1.0, 1.0)
+
         GL.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, self.ebo.gl_id)
         GL.glBindVertexArray(0)
 
     def destroy(self):
         self.vbo.destroy()
+        self.cbo.destroy()
         self.ebo.destroy()
         GL.glDeleteVertexArrays(1, [self.vao])
 
@@ -753,6 +775,7 @@ class TorchGLViewer:
         vertices: torch.Tensor,
         faces: torch.Tensor,
         color=(0.8, 0.8, 0.8),
+        vertex_colors: Optional[torch.Tensor] = None,
         offset=(0.0, 0.0, 0.0),
     ):
         if name in self.meshes:
@@ -763,7 +786,7 @@ class TorchGLViewer:
         self.meshes[name] = m
         m.color = np.asarray(color, dtype=np.float32)
         m.offset = np.asarray(offset, dtype=np.float32)
-        self.update_mesh(name, vertices=vertices, faces=faces)
+        self.update_mesh(name, vertices=vertices, faces=faces, vertex_colors=vertex_colors)
         return name
 
     def update_mesh(
@@ -772,6 +795,7 @@ class TorchGLViewer:
         vertices: Optional[torch.Tensor] = None,
         faces: Optional[torch.Tensor] = None,
         color: Optional[Sequence[float]] = None,
+        vertex_colors: Optional[torch.Tensor] = None,
         offset: Optional[Sequence[float]] = None,
     ):
         self._begin_graphics_command()
@@ -783,6 +807,19 @@ class TorchGLViewer:
             m.vbo.upload(v)
             self._upload_ms_frame += (time.perf_counter() - upload_started_at) * 1000.0
             m.n_vertices = v.shape[0]
+
+        if vertex_colors is not None:
+            c = self._colors(vertex_colors)
+            if c.shape[0] != m.n_vertices:
+                raise ValueError(
+                    f"Expected {m.n_vertices} vertex colors, got {c.shape[0]}"
+                )
+            upload_started_at = time.perf_counter()
+            m.cbo.upload(c)
+            self._upload_ms_frame += (time.perf_counter() - upload_started_at) * 1000.0
+            m.has_vertex_colors = c.shape[0] > 0
+        elif vertices is not None:
+            m.has_vertex_colors = False
 
         if faces is not None:
             f = self._faces(faces)
@@ -987,6 +1024,10 @@ class TorchGLViewer:
             GL.glUniform3fv(
                 self._uniform_location(self.mesh_program, "u_color"), 1, m.color
             )
+            GL.glUniform1i(
+                self._uniform_location(self.mesh_program, "u_use_vertex_color"),
+                int(m.has_vertex_colors),
+            )
             GL.glUniform3fv(
                 self._uniform_location(self.mesh_program, "u_offset"), 1, m.offset
             )
@@ -1127,6 +1168,19 @@ class TorchGLViewer:
             raise ValueError(f"Expected [M,3], got {tuple(x.shape)}")
         # OpenGL indexed draw uses uint32 here.
         return x.detach().to(dtype=torch.int32).contiguous()
+
+    def _colors(self, x: torch.Tensor):
+        if not isinstance(x, torch.Tensor):
+            raise TypeError("Expected torch.Tensor")
+        if not x.is_cuda:
+            raise ValueError("Vertex colors must be a CUDA tensor")
+        if x.device.index not in (None, self.cuda_device):
+            raise ValueError(
+                f"Tensor is on CUDA:{x.device.index}, viewer uses CUDA:{self.cuda_device}"
+            )
+        if x.ndim != 2 or x.shape[1] != 3:
+            raise ValueError(f"Expected [N,3], got {tuple(x.shape)}")
+        return x.detach().to(dtype=torch.float32).clamp(0.0, 1.0).contiguous()
 
     def _camera_eye(self):
         eye, _forward, _right, _up = self._camera_basis()
