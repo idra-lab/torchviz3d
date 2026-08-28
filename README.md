@@ -3,6 +3,8 @@
 A small high-performance 3D viewer for meshes and point clouds stored as
 PyTorch CUDA tensors.
 
+https://github.com/user-attachments/assets/9abbaaa6-29f0-4836-9118-e93a26098493
+
 ## Why
 
 When working with CUDA tensors, a common visualization pipeline is:
@@ -122,14 +124,9 @@ python3 demo_triangle.py
 
 Preview:
 
-<img src="assets/triangle.png" alt="triangle demo" width="600" align="center" />
-
-
-Run the procedural demo. It does not need external meshes, models, or datasets.
-```bash
-python3 demo_avatar_army.py --avatars 1024
-```
-
+<p align="center">
+  <img src="assets/triangle.png" alt="triangle demo" width="600" />
+</p>
 
 Stanford bunny mesh and point cloud side by side:
 
@@ -138,8 +135,15 @@ python3 Vitruvius/viewer/demo_bunny_mesh_pointcloud.py
 ```
 
 Preview:
+<p align="center">
+<img src="assets/bunny.png" alt="Stanford bunny mesh and point cloud demo" width="600" />
+</p>
 
-<img src="assets/bunny.png" alt="Stanford bunny mesh and point cloud demo" width="600" align="center" />
+
+Run the procedural demo (video above).
+```bash
+python3 demo_avatar_army.py --avatars 1024
+```
 
 ## Reading The Timings
 
