@@ -137,9 +137,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Stanford bunny mesh + point cloud demo."
     )
-    parser.add_argument(
-        "--ply", type=Path, default=Path(__file__).with_name("bunny.ply")
-    )
+    parser.add_argument("--ply", type=Path, required=True)
     parser.add_argument("--width", type=int, default=1600)
     parser.add_argument("--height", type=int, default=900)
     parser.add_argument("--cuda-device", type=int, default=0)

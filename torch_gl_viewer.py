@@ -312,6 +312,7 @@ uniform float u_ambient_strength;
 uniform float u_diffuse_strength;
 uniform float u_specular_strength;
 uniform float u_shininess;
+uniform float u_alpha;
 
 void main() {
     vec3 dx = dFdx(v_world_pos);
@@ -328,7 +329,7 @@ void main() {
     vec3 ambient_term = u_ambient_strength * v_color;
     vec3 diffuse_term = u_diffuse_strength * ndotl * v_color;
     vec3 specular_term = u_specular_strength * specular * u_light_color;
-    out_color = vec4(ambient_term + diffuse_term + specular_term, 1.0);
+    out_color = vec4(ambient_term + diffuse_term + specular_term, u_alpha);
 }
 """
 
@@ -483,6 +484,7 @@ class _MeshGPU:
         self.offset = np.zeros(3, dtype=np.float32)
         self.has_vertex_colors = False
         self.visible = True
+        self.alpha = 1.0
 
     def bind_layout(self):
         GL.glBindVertexArray(self.vao)
@@ -777,6 +779,7 @@ class TorchGLViewer:
         color=(0.8, 0.8, 0.8),
         vertex_colors: Optional[torch.Tensor] = None,
         offset=(0.0, 0.0, 0.0),
+        alpha=1.0,
     ):
         if name in self.meshes:
             raise KeyError(f"Mesh {name!r} already exists")
@@ -786,6 +789,7 @@ class TorchGLViewer:
         self.meshes[name] = m
         m.color = np.asarray(color, dtype=np.float32)
         m.offset = np.asarray(offset, dtype=np.float32)
+        m.alpha = float(alpha)
         self.update_mesh(name, vertices=vertices, faces=faces, vertex_colors=vertex_colors)
         return name
 
@@ -797,6 +801,7 @@ class TorchGLViewer:
         color: Optional[Sequence[float]] = None,
         vertex_colors: Optional[torch.Tensor] = None,
         offset: Optional[Sequence[float]] = None,
+        alpha: Optional[float] = None,
     ):
         self._begin_graphics_command()
         m = self.meshes[name]
@@ -832,6 +837,8 @@ class TorchGLViewer:
             m.color = np.asarray(color, dtype=np.float32)
         if offset is not None:
             m.offset = np.asarray(offset, dtype=np.float32)
+        if alpha is not None:
+            m.alpha = float(alpha)
 
         # Buffer IDs stay constant unless buffer capacity had to grow.
         # Re-binding is cheap and ensures VAO state is correct.
@@ -905,6 +912,12 @@ class TorchGLViewer:
         if name not in self.meshes:
             raise KeyError(name)
         self.meshes[name].color = np.asarray(color, dtype=np.float32)
+
+    def set_mesh_alpha(self, name: str, alpha: float):
+        self._begin_graphics_command()
+        if name not in self.meshes:
+            raise KeyError(name)
+        self.meshes[name].alpha = float(alpha)
 
     def set_lighting(
         self,
@@ -1018,26 +1031,28 @@ class TorchGLViewer:
             self.lighting.shininess,
         )
 
-        for m in self.meshes.values():
-            if not m.visible or m.n_indices == 0:
-                continue
-            GL.glUniform3fv(
-                self._uniform_location(self.mesh_program, "u_color"), 1, m.color
-            )
-            GL.glUniform1i(
-                self._uniform_location(self.mesh_program, "u_use_vertex_color"),
-                int(m.has_vertex_colors),
-            )
-            GL.glUniform3fv(
-                self._uniform_location(self.mesh_program, "u_offset"), 1, m.offset
-            )
-            GL.glBindVertexArray(m.vao)
-            GL.glDrawElements(
-                GL.GL_TRIANGLES,
-                m.n_indices,
-                GL.GL_UNSIGNED_INT,
-                ctypes.c_void_p(0),
-            )
+        drawable = [
+            m for m in self.meshes.values() if m.visible and m.n_indices > 0
+        ]
+        opaque_meshes = [m for m in drawable if m.alpha >= 1.0]
+        transparent_meshes = [m for m in drawable if m.alpha < 1.0]
+
+        for m in opaque_meshes:
+            self._draw_mesh(m)
+
+        if transparent_meshes:
+            # Transparent meshes are blended on top without writing depth, so
+            # opaque geometry drawn behind them (e.g. a skeleton mesh) stays
+            # visible through them. Painter's-algorithm back-to-front sorting
+            # is not performed, so overlapping transparent meshes may not
+            # blend in a strictly correct order.
+            GL.glEnable(GL.GL_BLEND)
+            GL.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA)
+            GL.glDepthMask(GL.GL_FALSE)
+            for m in transparent_meshes:
+                self._draw_mesh(m)
+            GL.glDepthMask(GL.GL_TRUE)
+            GL.glDisable(GL.GL_BLEND)
 
         # points
         GL.glUseProgram(self.point_program)
@@ -1277,6 +1292,22 @@ class TorchGLViewer:
         loc = self._uniform_location(program, name)
         # numpy is row-major; transpose=True gives GL the intended matrix.
         GL.glUniformMatrix4fv(loc, 1, GL.GL_TRUE, m)
+
+    def _draw_mesh(self, m: "_MeshGPU"):
+        GL.glUniform3fv(self._uniform_location(self.mesh_program, "u_color"), 1, m.color)
+        GL.glUniform1i(
+            self._uniform_location(self.mesh_program, "u_use_vertex_color"),
+            int(m.has_vertex_colors),
+        )
+        GL.glUniform3fv(self._uniform_location(self.mesh_program, "u_offset"), 1, m.offset)
+        GL.glUniform1f(self._uniform_location(self.mesh_program, "u_alpha"), m.alpha)
+        GL.glBindVertexArray(m.vao)
+        GL.glDrawElements(
+            GL.GL_TRIANGLES,
+            m.n_indices,
+            GL.GL_UNSIGNED_INT,
+            ctypes.c_void_p(0),
+        )
 
     # ------------------------------ input ----------------------------------
 
